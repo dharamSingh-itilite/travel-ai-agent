@@ -10,7 +10,8 @@ from langgraph.prebuilt import create_react_agent
 from config import load_mcp_servers
 from mcp_client import McpClient
 
-MODEL = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-20250514")
+MODEL = os.getenv("ANTHROPIC_MODEL", "claude-opus-4-20250514")
+MAX_MESSAGES = 20
 SYSTEM_PROMPT_FILE = Path(__file__).parent / "system_prompt.md"
 
 mcp_client = McpClient()
@@ -32,6 +33,14 @@ async def shutdown_agent():
     await mcp_client.cleanup()
 
 
+def trim_to_recent(messages: list) -> list:
+    """Keep only the last MAX_MESSAGES to avoid context overflow."""
+    if len(messages) <= MAX_MESSAGES:
+        return messages
+    print(f"[INFO] Trimming conversation from {len(messages)} to {MAX_MESSAGES} messages")
+    return messages[-MAX_MESSAGES:]
+
+
 def build_agent():
     """Build and return a LangGraph ReAct agent with MCP tools."""
     llm = ChatAnthropic(model=MODEL, temperature=0)
@@ -42,12 +51,17 @@ def build_agent():
         tools=mcp_client.tools,
         prompt=system_prompt,
         checkpointer=memory,
+        state_modifier=trim_to_recent,
     )
     return agent
 
 
 async def run_agent(user_message: str, thread_id: str) -> str:
     """Run the agent with a user message and return the final response."""
+    if _agent is None:
+        print("[ERROR] Agent not initialized")
+        return "Agent is not ready. Please try again later."
+
     inputs = {"messages": [("user", user_message)]}
     config = {"configurable": {"thread_id": thread_id}}
     response = await _agent.ainvoke(inputs, config=config)

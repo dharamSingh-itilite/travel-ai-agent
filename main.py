@@ -31,6 +31,7 @@ class ChatResponse(BaseModel):
     trip_id: str | None = None
     session_id: str | None = None
     message: str
+    session_status: str = "OPEN"  # "OPEN" or "CLOSED"
 
 
 def build_agent_message(request: ChatRequest) -> str:
@@ -47,6 +48,25 @@ def build_agent_message(request: ChatRequest) -> str:
     return "\n".join(parts)
 
 
+def detect_session_status(response: str) -> str:
+    """Return CLOSED if the agent approved/rejected the trip, else OPEN."""
+    for line in response.split("\n"):
+        stripped = line.strip().lower()
+        if stripped.startswith("status:"):
+            status_value = stripped.split(":", 1)[1].strip()
+            if "approved" in status_value or "rejected" in status_value:
+                return "CLOSED"
+    return "OPEN"
+
+
+def extract_short_message(response: str) -> str:
+    """Extract the Message: line if present, otherwise return full response."""
+    for line in response.split("\n"):
+        if line.strip().lower().startswith("message:"):
+            return line.split(":", 1)[1].strip()
+    return response
+
+
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest) -> ChatResponse:
     """Process a user message through the AI agent."""
@@ -55,10 +75,12 @@ async def chat(request: ChatRequest) -> ChatResponse:
     print(f"[INFO] Agent message: {agent_message[:200]}")
     result = await run_agent(agent_message, request.thread_id)
     print(f"[INFO] Response: {result[:100]}")
+    session_status = detect_session_status(result)
     return ChatResponse(
         trip_id=request.trip_id,
         session_id=request.thread_id,
-        message=result,
+        message=extract_short_message(result),
+        session_status=session_status,
     )
 
 

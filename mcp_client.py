@@ -83,7 +83,7 @@ class McpClient:
         properties = schema.get("properties", {})
         required = set(schema.get("required", []))
 
-        TYPE_MAP = {"string": str, "integer": int, "number": float, "boolean": bool}
+        TYPE_MAP = {"string": str, "integer": int, "number": float, "boolean": bool, "array": list, "object": dict}
         fields: dict[str, Any] = {}
         for field_name, field_schema in properties.items():
             field_type = TYPE_MAP.get(field_schema.get("type", "string"), str)

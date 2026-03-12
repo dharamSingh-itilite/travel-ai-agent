@@ -46,8 +46,35 @@ async def test_chat_success(client):
 
     assert response.status_code == 200
     data = response.json()
-    assert data["response"] == "Hello! How can I help you?"
+    assert data["message"] == "Hello! How can I help you?"
+    assert data["session_status"] == "OPEN"
     mock_run.assert_called_once_with("Hi there", "t1")
+
+
+@pytest.mark.asyncio
+async def test_chat_approved_closes_session(client):
+    ac, (_, _, mock_run) = client
+    mock_run.return_value = "Status: APPROVED\nMessage: Trip approved for $500."
+
+    response = await ac.post("/chat", json={"message": "approve", "thread_id": "t1"})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["session_status"] == "CLOSED"
+    assert data["message"] == "Trip approved for $500."
+
+
+@pytest.mark.asyncio
+async def test_chat_rejected_closes_session(client):
+    ac, (_, _, mock_run) = client
+    mock_run.return_value = "Status: REJECTED\nMessage: Trip rejected per user request."
+
+    response = await ac.post("/chat", json={"message": "reject", "thread_id": "t1"})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["session_status"] == "CLOSED"
+    assert data["message"] == "Trip rejected per user request."
 
 
 @pytest.mark.asyncio
@@ -58,13 +85,13 @@ async def test_chat_empty_message(client):
     response = await ac.post("/chat", json={"message": "", "thread_id": "t2"})
 
     assert response.status_code == 200
-    assert "response" in response.json()
+    assert "message" in response.json()
 
 
 @pytest.mark.asyncio
 async def test_chat_missing_message_field(client):
     ac, _ = client
-    response = await ac.post("/chat", json={"text": "wrong field"})
+    response = await ac.post("/chat", json={"text": "wrong field", "thread_id": "t0"})
 
     assert response.status_code == 422  # Pydantic validation error
 
@@ -86,4 +113,4 @@ async def test_chat_long_message(client):
     response = await ac.post("/chat", json={"message": long_message, "thread_id": "t3"})
 
     assert response.status_code == 200
-    assert response.json()["response"] == "Once upon a time..."
+    assert response.json()["message"] == "Once upon a time..."
