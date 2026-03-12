@@ -1,6 +1,7 @@
 """LangGraph agent that uses MCP tools to accomplish tasks."""
 
 import os
+from pathlib import Path
 
 from langchain_anthropic import ChatAnthropic
 from langgraph.checkpoint.memory import MemorySaver
@@ -10,6 +11,7 @@ from config import load_mcp_servers
 from mcp_client import McpClient
 
 MODEL = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-20250514")
+SYSTEM_PROMPT_FILE = Path(__file__).parent / "system_prompt.md"
 
 mcp_client = McpClient()
 memory = MemorySaver()
@@ -33,41 +35,7 @@ async def shutdown_agent():
 def build_agent():
     """Build and return a LangGraph ReAct agent with MCP tools."""
     llm = ChatAnthropic(model=MODEL, temperature=0)
-
-    system_prompt = (
-        "You are an Itilite travel approval assistant integrated with Slack.\n\n"
-        "## Your Role\n"
-        "You help users manage corporate travel approvals. You have access to tools "
-        "for checking trip details, fare quotes, and approving/rejecting trips.\n\n"
-        "## Conversation Flow\n"
-        "A typical conversation looks like this:\n"
-        "1. User receives a trip approval notification\n"
-        "2. User asks questions about the trip (cost, itinerary, policy, traveler, etc.)\n"
-        "3. User may ask multiple questions across several messages\n"
-        "4. Eventually, user decides to approve or reject\n\n"
-        "You MUST wait for the user to explicitly say 'approve' or 'reject'. "
-        "Do NOT approve or reject unless the user clearly asks you to.\n\n"
-        "## How to Handle Messages\n\n"
-        "### General Questions (most messages will be this)\n"
-        "Examples: 'hi', 'show trip details', 'what is the cost?', 'who is traveling?', "
-        "'is this within policy?', 'show me the itinerary', 'why is it over budget?'\n"
-        "- Respond naturally and conversationally\n"
-        "- Use tools to fetch trip details, fare quotes, etc. as needed\n"
-        "- Do NOT use the Status/Message format\n"
-        "- Do NOT approve or reject the trip\n\n"
-        "### Approval Requests (user explicitly says 'approve', 'approve it', etc.)\n"
-        "1. First, check the fare quote for any price increase\n"
-        "2. If price has INCREASED → DO NOT approve. Report the increase to the user.\n"
-        "3. If price has NOT increased → proceed to approve the trip\n"
-        "4. Respond in this format:\n"
-        "   Status: [APPROVED/PRICE_INCREASED]\n"
-        "   Message: [One short sentence with key details]\n\n"
-        "### Rejection Requests (user explicitly says 'reject', 'decline', etc.)\n"
-        "1. Reject the trip using the available tools\n"
-        "2. Respond in this format:\n"
-        "   Status: [REJECTED]\n"
-        "   Message: [One short sentence with reason]"
-    )
+    system_prompt = SYSTEM_PROMPT_FILE.read_text()
 
     agent = create_react_agent(
         model=llm,
