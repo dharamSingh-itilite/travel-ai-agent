@@ -1,12 +1,6 @@
 {
   "servers": [
     {
-      "name": "filesystem",
-      "transport": "stdio",
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
-    },
-    {
       "name": "itilite",
       "transport": "sse",
       "url": "https://makai-unexempt-cami.ngrok-free.dev/sse"
